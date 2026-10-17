@@ -28,6 +28,8 @@ import com.metrolist.music.constants.PlaylistSortType
 import com.metrolist.music.constants.SongSortType
 import com.metrolist.music.db.entities.Album
 import com.metrolist.music.db.entities.AlbumArtistMap
+import com.metrolist.music.db.entities.BlockedSongEntity
+import com.metrolist.music.db.entities.BlockSyncStatus
 import com.metrolist.music.db.entities.AlbumEntity
 import com.metrolist.music.db.entities.AlbumWithSongs
 import com.metrolist.music.db.entities.Artist
@@ -58,6 +60,7 @@ import com.metrolist.music.models.toMediaMetadata
 import com.metrolist.music.ui.utils.resize
 import com.metrolist.music.utils.ArtistNameAliases
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -2043,4 +2046,38 @@ interface DatabaseDao {
 
     @Delete
     fun delete(podcast: PodcastEntity)
+
+    // Blocked songs methods
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(blockedSong: BlockedSongEntity)
+
+    @Delete
+    fun delete(blockedSong: BlockedSongEntity)
+
+    @Query("DELETE FROM blocked_song WHERE id = :id")
+    fun deleteBlockedSong(id: String)
+
+    @Query("DELETE FROM blocked_song")
+    fun clearBlockedSongs()
+
+    @Query("SELECT * FROM blocked_song WHERE id = :id")
+    fun blockedSong(id: String): Flow<BlockedSongEntity?>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM blocked_song WHERE id = :id)")
+    fun isBlocked(id: String): Flow<Boolean>
+
+    @Query("SELECT * FROM blocked_song ORDER BY blockedAt DESC")
+    fun allBlockedSongs(): Flow<List<BlockedSongEntity>>
+
+    @Query("SELECT id FROM blocked_song")
+    fun getAllBlockedSongIdsFlow(): Flow<List<String>>
+
+    fun allBlockedSongIds(): Flow<List<String>> = getAllBlockedSongIdsFlow().distinctUntilChanged()
+
+    @Query("SELECT id FROM blocked_song")
+    fun allBlockedSongIdsDirect(): List<String>
+
+    @Query("UPDATE blocked_song SET remoteStatus = :status WHERE id = :id")
+    fun updateBlockedSongRemoteStatus(id: String, status: BlockSyncStatus)
 }

@@ -120,4 +120,53 @@ class ParserRegressionTest {
             assertEquals(Artist("Owner & Friends", null), (artist.items.single() as EpisodeItem).author)
         }
     }
+
+    @Test
+    fun `home playlist tile without shuffle button retains playlist item and does not drop carousel`() {
+        val noShuffleMenu = """{"menuRenderer":{"items":[]}}"""
+        val playlistTile = """{
+            "title":{"runs":[{"text":"Featured Playlist"}]}, "subtitle":{"runs":[{"text":"Playlist • Metrolist"}]},
+            "navigationEndpoint":${endpoint("PLAYLIST")}, "thumbnailRenderer":$cover,
+            "thumbnailOverlay":$overlay, "menu":$noShuffleMenu
+        }"""
+        val carouselJson = """{
+            "header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Featured"}]}}},
+            "contents":[{"musicTwoRowItemRenderer":$playlistTile}]
+        }"""
+        val home = HomePage.Section.fromMusicCarouselShelfRenderer(json.decodeFromString<MusicCarouselShelfRenderer>(carouselJson))!!
+        val playlist = home.items.single() as PlaylistItem
+        assertEquals("Featured Playlist", playlist.title)
+    }
+
+    @Test
+    fun `home artist tile with user channel page type retains artist item`() {
+        val artistTile = """{
+            "title":{"runs":[{"text":"Similar Artist"}]}, "subtitle":{"runs":[{"text":"Artist"}]},
+            "navigationEndpoint":${endpoint("USER_CHANNEL")}, "thumbnailRenderer":$cover,
+            "thumbnailOverlay":$overlay, "menu":{"menuRenderer":{"items":[]}}
+        }"""
+        val carouselJson = """{
+            "header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Similar to Artist"}]}}},
+            "contents":[{"musicTwoRowItemRenderer":$artistTile}]
+        }"""
+        val home = HomePage.Section.fromMusicCarouselShelfRenderer(json.decodeFromString<MusicCarouselShelfRenderer>(carouselJson))!!
+        val artist = home.items.single() as com.metrolist.innertube.models.ArtistItem
+        assertEquals("Similar Artist", artist.title)
+    }
+
+    @Test
+    fun `home album tile without watchPlaylistEndpoint falls back to browseId`() {
+        val noOverlayAlbumTile = """{
+            "title":{"runs":[{"text":"Album for You"}]}, "subtitle":{"runs":[{"text":"Artist"}]},
+            "navigationEndpoint":${endpoint("ALBUM")}, "thumbnailRenderer":$cover
+        }"""
+        val carouselJson = """{
+            "header":{"musicCarouselShelfBasicHeaderRenderer":{"title":{"runs":[{"text":"Albums for you"}]}}},
+            "contents":[{"musicTwoRowItemRenderer":$noOverlayAlbumTile}]
+        }"""
+        val home = HomePage.Section.fromMusicCarouselShelfRenderer(json.decodeFromString<MusicCarouselShelfRenderer>(carouselJson))!!
+        val album = home.items.single() as AlbumItem
+        assertEquals("Album for You", album.title)
+        assertEquals("VLitem", album.playlistId)
+    }
 }

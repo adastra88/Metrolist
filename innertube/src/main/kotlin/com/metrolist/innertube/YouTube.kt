@@ -2212,6 +2212,17 @@ object YouTube {
         }
     }
 
+    suspend fun dislikeVideo(
+        videoId: String,
+        dislike: Boolean = true,
+    ) = runCatching {
+        if (dislike) {
+            innerTube.dislikeVideo(WEB_REMIX, videoId)
+        } else {
+            innerTube.unlikeVideo(WEB_REMIX, videoId)
+        }
+    }
+
     suspend fun likePlaylist(
         playlistId: String,
         like: Boolean,

@@ -32,11 +32,10 @@ data class MusicResponsiveListItemRenderer(
 ) {
     val isSong: Boolean
         get() = navigationEndpoint == null
-            || navigationEndpoint.watchEndpoint != null
-            || navigationEndpoint.watchPlaylistEndpoint != null
+            || navigationEndpoint.anyWatchEndpoint != null
             || overlay?.musicItemThumbnailOverlayRenderer
                 ?.content?.musicPlayButtonRenderer
-                ?.playNavigationEndpoint?.watchEndpoint != null
+                ?.playNavigationEndpoint?.anyWatchEndpoint != null
     val isPlaylist: Boolean
         get() = navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_PLAYLIST
     val isAlbum: Boolean
@@ -96,13 +95,14 @@ data class MusicResponsiveListItemRenderer(
 
     val videoId: String?
         get() = playlistItemData?.videoId
+            ?: navigationEndpoint?.anyWatchEndpoint?.videoId
             ?: flexColumns.firstOrNull()
                 ?.musicResponsiveListItemFlexColumnRenderer
                 ?.text?.runs?.firstOrNull()
-                ?.navigationEndpoint?.watchEndpoint?.videoId
+                ?.navigationEndpoint?.anyWatchEndpoint?.videoId
             ?: overlay?.musicItemThumbnailOverlayRenderer
                 ?.content?.musicPlayButtonRenderer
-                ?.playNavigationEndpoint?.watchEndpoint?.videoId
+                ?.playNavigationEndpoint?.anyWatchEndpoint?.videoId
 
     val playlistSetVideoId: String?
         get() = playlistItemData?.playlistSetVideoId

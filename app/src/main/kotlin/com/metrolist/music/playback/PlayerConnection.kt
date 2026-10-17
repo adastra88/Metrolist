@@ -667,6 +667,10 @@ class PlayerConnection(
         }
     }
 
+    fun removeBlockedSongFromQueue(songId: String) {
+        service.removeBlockedSongFromQueue(songId)
+    }
+
     fun dispose() {
         try {
             attachedPlayer?.removeListener(this)

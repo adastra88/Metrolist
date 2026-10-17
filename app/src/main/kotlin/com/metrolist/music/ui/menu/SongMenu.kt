@@ -77,6 +77,8 @@ import com.metrolist.music.constants.ListThumbnailSize
 import com.metrolist.music.db.entities.ArtistEntity
 import com.metrolist.music.db.entities.Event
 import com.metrolist.music.db.entities.PlaylistSong
+import com.metrolist.music.db.entities.BlockedSongEntity
+import com.metrolist.music.db.entities.BlockSyncStatus
 import com.metrolist.music.db.entities.PodcastEntity
 import com.metrolist.music.db.entities.Song
 import com.metrolist.music.db.entities.SpeedDialItem
@@ -137,6 +139,7 @@ fun SongMenu(
     )
 
     val isPinned by database.speedDialDao.isPinned(song.id).collectAsStateWithLifecycle(initialValue = false)
+    val isBlocked by database.isBlocked(song.id).collectAsStateWithLifecycle(initialValue = false)
 
     // Podcast subscription state for episodes
     val podcastEntity by produceState<PodcastEntity?>(initialValue = null, song) {
@@ -694,6 +697,47 @@ fun SongMenu(
                                         }
                                     }
                                     onDismiss()
+                                },
+                            ),
+                        )
+                        add(
+                            Material3MenuItemData(
+                                title = {
+                                    Text(
+                                        text = stringResource(if (isBlocked) R.string.unblock else R.string.dislike_and_block_song),
+                                    )
+                                },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(if (isBlocked) R.drawable.close else R.drawable.thumb_down),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    onDismiss()
+                                    if (isBlocked) {
+                                        database.query {
+                                            deleteBlockedSong(song.id)
+                                        }
+                                        syncUtils.dislikeSong(song.id, dislike = false)
+                                        Toast.makeText(context, R.string.song_unblocked, Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val blockedEntity = BlockedSongEntity(
+                                            id = song.id,
+                                            title = song.song.title,
+                                            artist = song.orderedArtists.joinToString(", ") { it.name },
+                                            thumbnailUrl = song.thumbnailUrl,
+                                            duration = song.song.duration,
+                                            blockedAt = LocalDateTime.now(),
+                                            remoteStatus = BlockSyncStatus.PENDING,
+                                        )
+                                        database.query {
+                                            insert(blockedEntity)
+                                        }
+                                        syncUtils.dislikeSong(song.id, dislike = true)
+                                        playerConnection.removeBlockedSongFromQueue(song.id)
+                                        Toast.makeText(context, R.string.song_blocked, Toast.LENGTH_SHORT).show()
+                                    }
                                 },
                             ),
                         )

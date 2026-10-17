@@ -7,7 +7,7 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
-val baseApplicationId = "com.metrolist.music"
+val baseApplicationId = "com.metrolist.music.s"
 val applicationIdOverride = System.getenv("METROLIST_APPLICATION_ID")?.takeIf { it.isNotBlank() }
 val appNameOverride = System.getenv("METROLIST_APP_NAME")?.takeIf { it.isNotBlank() }
 val buildCommit =
@@ -45,7 +45,7 @@ android {
         val baseVersionName = requireNotNull(versionName)
         buildConfigField("String", "BASE_VERSION_NAME", "\"$baseVersionName\"")
         buildCommit?.let { versionName = "$baseVersionName+$it" }
-        resValue("string", "app_name", appNameOverride ?: "Metrolist")
+        resValue("string", "app_name", appNameOverride ?: "metrolist-s")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -122,6 +122,16 @@ android {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
+            signingConfig =
+                if (signingConfigs.getByName("release").storeFile?.exists() == true && System.getenv("STORE_PASSWORD") != null) {
+                    signingConfigs.getByName("release")
+                } else if (workflowDebugKeystoreFile != null) {
+                    signingConfigs.getByName("workflowDebug")
+                } else if (persistentDebugKeystoreFile.exists()) {
+                    signingConfigs.getByName("persistentDebug")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -133,7 +143,7 @@ android {
             }
             isDebuggable = true
             if (appNameOverride == null) {
-                resValue("string", "app_name", "Metrolist Debug")
+                resValue("string", "app_name", "metrolist-s Debug")
             }
             signingConfig =
                 if (workflowDebugKeystoreFile != null) {

@@ -23,6 +23,7 @@ import com.metrolist.music.constants.LastFullSyncKey
 import com.metrolist.music.constants.SYNC_COOLDOWN
 import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.db.entities.ArtistEntity
+import com.metrolist.music.db.entities.BlockSyncStatus
 import com.metrolist.music.db.entities.PlaylistEntity
 import com.metrolist.music.db.entities.PlaylistSongMap
 import com.metrolist.music.db.entities.PodcastEntity
@@ -73,6 +74,7 @@ sealed class SyncOperation {
     data class SubscribeChannel(val channelId: String, val subscribe: Boolean) : SyncOperation()
     data class SavePodcast(val podcastId: String, val save: Boolean) : SyncOperation()
     data class SaveEpisode(val episodeId: String, val save: Boolean, val setVideoId: String?) : SyncOperation()
+    data class DislikeSong(val songId: String, val dislike: Boolean = true) : SyncOperation()
     data object ClearPodcastData : SyncOperation()
 }
 
@@ -362,6 +364,7 @@ class SyncUtils @Inject constructor(
         SyncOperation.AutoSyncPlaylists -> "autoSyncPlaylists"
         is SyncOperation.SinglePlaylist -> "playlist:$browseId"
         SyncOperation.ClearPodcastData -> "clearPodcastData"
+        is SyncOperation.DislikeSong -> "dislike:${songId}_$dislike"
         is SyncOperation.LikeSong,
         is SyncOperation.SubscribeChannel,
         is SyncOperation.SavePodcast,
@@ -403,6 +406,7 @@ class SyncUtils @Inject constructor(
             is SyncOperation.SubscribeChannel -> executeSubscribeChannel(operation.channelId, operation.subscribe)
             is SyncOperation.SavePodcast -> executeSavePodcast(operation.podcastId, operation.save)
             is SyncOperation.SaveEpisode -> executeSaveEpisode(operation.episodeId, operation.save, operation.setVideoId)
+            is SyncOperation.DislikeSong -> executeDislikeSong(operation.songId, operation.dislike)
             is SyncOperation.ClearPodcastData -> executeClearPodcastData()
         }
     }
@@ -488,6 +492,10 @@ class SyncUtils @Inject constructor(
 
     fun likeSong(s: SongEntity) {
         enqueue(SyncOperation.LikeSong(s))
+    }
+
+    fun dislikeSong(songId: String, dislike: Boolean = true) {
+        enqueue(SyncOperation.DislikeSong(songId, dislike))
     }
 
     fun subscribeChannel(channelId: String, subscribe: Boolean) {
@@ -590,7 +598,8 @@ class SyncUtils @Inject constructor(
                     "room_master_table",
                     "sqlite_sequence",
                     "search_history",  // Already cleared above
-                    "listen_history"   // Already cleared above
+                    "listen_history",   // Already cleared above
+                    "blocked_song"     // Local blocklist is persistent across account sessions
                 )
 
                 // Tables with foreign key references - delete these first (mapping tables)
@@ -734,6 +743,26 @@ class SyncUtils @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "Failed to update LastFM love status")
             }
+        }
+    }
+
+    private suspend fun executeDislikeSong(songId: String, dislike: Boolean) = withContext(Dispatchers.IO) {
+        if (!isLoggedIn()) {
+            Timber.w("Skipping remote dislike - user not logged in")
+            database.updateBlockedSongRemoteStatus(songId, BlockSyncStatus.LOCAL_ONLY)
+            return@withContext
+        }
+
+        database.updateBlockedSongRemoteStatus(songId, BlockSyncStatus.PENDING)
+
+        withRetry {
+            YouTube.dislikeVideo(songId, dislike)
+        }.onSuccess {
+            Timber.d("Successfully synced dislike for song $songId (dislike=$dislike)")
+            database.updateBlockedSongRemoteStatus(songId, BlockSyncStatus.SYNCED)
+        }.onFailure { e ->
+            Timber.e(e, "Failed to sync dislike for song $songId")
+            database.updateBlockedSongRemoteStatus(songId, BlockSyncStatus.FAILED)
         }
     }
 

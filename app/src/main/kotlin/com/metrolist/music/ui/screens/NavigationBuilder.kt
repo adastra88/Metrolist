@@ -47,6 +47,7 @@ import com.metrolist.music.ui.screens.settings.AiSettings
 import com.metrolist.music.ui.screens.settings.AndroidAutoSettings
 import com.metrolist.music.ui.screens.settings.AppearanceSettings
 import com.metrolist.music.ui.screens.settings.BackupAndRestore
+import com.metrolist.music.ui.screens.settings.BlockedSongsScreen
 import com.metrolist.music.ui.screens.settings.ContentSettings
 import com.metrolist.music.ui.screens.settings.DarkMode
 import com.metrolist.music.ui.screens.settings.PlayerSettings
@@ -362,6 +363,10 @@ fun NavGraphBuilder.navigationBuilder(
 
     composable("settings/content/romanization") {
         RomanizationSettings(navController)
+    }
+
+    composable("settings/content/blocked_songs") {
+        BlockedSongsScreen(navController)
     }
 
     composable("settings/ai") {

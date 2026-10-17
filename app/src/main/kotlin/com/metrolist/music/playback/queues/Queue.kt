@@ -30,6 +30,9 @@ interface Queue {
         fun filterVideoSongs(disableVideos: Boolean = false) =
             if (disableVideos) filterItems { it.metadata?.isVideoSong != true } else this
 
+        fun filterBlocked(blockedIds: Set<String>) =
+            if (blockedIds.isNotEmpty()) filterItems { it.mediaId !in blockedIds } else this
+
         // Keeps mediaItemIndex on the same song; if that song is removed, starts at the next kept one.
         private fun filterItems(keep: (MediaItem) -> Boolean): Status {
             val filtered = items.filter(keep)
@@ -57,6 +60,13 @@ fun List<MediaItem>.filterExplicit(enabled: Boolean = true) =
 fun List<MediaItem>.filterVideoSongs(disableVideos: Boolean = false) =
     if (disableVideos) {
         filterNot { it.metadata?.isVideoSong == true }
+    } else {
+        this
+    }
+
+fun List<MediaItem>.filterBlocked(blockedIds: Set<String>) =
+    if (blockedIds.isNotEmpty()) {
+        filterNot { it.mediaId in blockedIds }
     } else {
         this
     }

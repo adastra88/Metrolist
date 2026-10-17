@@ -18,6 +18,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -26,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.metrolist.music.LocalDatabase
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.ArtistItem
 import com.metrolist.innertube.models.EpisodeItem
@@ -60,6 +62,7 @@ fun YouTubeBrowseScreen(
     viewModel: YouTubeBrowseViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
+    val database = LocalDatabase.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
@@ -67,10 +70,15 @@ fun YouTubeBrowseScreen(
 
     val browseResult by viewModel.result.collectAsStateWithLifecycle()
 
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+
     val coroutineScope = rememberCoroutineScope()
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
 
-    val allItems = browseResult?.items?.flatMap { it.items } ?: emptyList()
+    val allItems = remember(browseResult, blockedSongIdSet) {
+        (browseResult?.items?.flatMap { it.items } ?: emptyList()).filterNot { it is SongItem && it.id in blockedSongIdSet }
+    }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = GridThumbnailHeight + if (gridItemSize == GridItemSize.BIG) 24.dp else (-24).dp),

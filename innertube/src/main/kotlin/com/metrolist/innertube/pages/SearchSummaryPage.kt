@@ -11,6 +11,7 @@ import com.metrolist.innertube.models.YTItem
 import com.metrolist.innertube.models.filterExplicit
 import com.metrolist.innertube.models.filterVideoSongs
 import com.metrolist.innertube.models.filterYoutubeShorts
+import com.metrolist.innertube.models.filterBlocked
 import com.metrolist.innertube.models.splitBySeparator
 import com.metrolist.innertube.utils.parseTime
 
@@ -67,6 +68,25 @@ data class SearchSummaryPage(
                                 return@mapNotNull null
                             },
                     )
+                },
+            )
+        } else {
+            this
+        }
+
+    fun filterBlocked(blockedSongIds: Set<String>) =
+        if (blockedSongIds.isNotEmpty()) {
+            SearchSummaryPage(
+                summaries.mapNotNull { s ->
+                    val filtered = s.items.filterBlocked(blockedSongIds)
+                    if (filtered.isEmpty()) {
+                        null
+                    } else {
+                        SearchSummary(
+                            title = s.title,
+                            items = filtered,
+                        )
+                    }
                 },
             )
         } else {

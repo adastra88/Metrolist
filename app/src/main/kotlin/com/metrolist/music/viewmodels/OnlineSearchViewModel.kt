@@ -19,11 +19,13 @@ import com.metrolist.innertube.models.YTItem
 import com.metrolist.innertube.models.filterExplicit
 import com.metrolist.innertube.models.filterVideoSongs
 import com.metrolist.innertube.models.filterYoutubeShorts
+import com.metrolist.innertube.models.filterBlocked
 import com.metrolist.innertube.pages.SearchSummaryPage
 import com.metrolist.music.constants.HideExplicitKey
 import com.metrolist.music.constants.HideVideoSongsKey
 import com.metrolist.music.constants.HideYoutubeShortsKey
 import com.metrolist.music.constants.PauseSearchHistoryKey
+import com.metrolist.music.db.MusicDatabase
 import com.metrolist.music.models.ItemsPage
 import com.metrolist.music.utils.SearchRoutes
 import com.metrolist.music.utils.dataStore
@@ -31,10 +33,12 @@ import com.metrolist.music.utils.get
 import com.metrolist.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,6 +46,7 @@ class OnlineSearchViewModel
 @Inject
 constructor(
     @ApplicationContext val context: Context,
+    val database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     val query = SearchRoutes.decodeQuery(savedStateHandle.get<String>("query").orEmpty())
@@ -86,7 +91,7 @@ constructor(
             }
         }
 
-    private suspend fun loadSummaryPage() {
+    private suspend fun loadSummaryPage() = withContext(Dispatchers.IO) {
         if (summaryPage == null) {
             YouTube
                 .searchSummary(query, recordSearchHistory = !context.dataStore.get(PauseSearchHistoryKey, false))
@@ -104,11 +109,13 @@ constructor(
                     val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                     val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
                     val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
+                    val blockedIds = database.allBlockedSongIdsDirect().toSet()
                     summaryPage =
                         resolvedPage
                             .filterExplicit(hideExplicit)
                             .filterVideoSongs(hideVideoSongs)
                             .filterYoutubeShorts(hideYoutubeShorts)
+                            .filterBlocked(blockedIds)
                 }.onFailure {
                     reportException(it)
                 }
@@ -116,7 +123,7 @@ constructor(
     }
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             filter.collect { filter ->
                 if (filter == null) {
                     loadSummaryPage()
@@ -146,13 +153,15 @@ constructor(
                                 val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                                 val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
                                 val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
+                                val blockedIds = database.allBlockedSongIdsDirect().toSet()
                                 viewStateMap[filter.value] =
                                     ItemsPage(
                                         resolvedItems
                                             .distinctBy { it.id }
                                             .filterExplicit(hideExplicit)
                                             .filterVideoSongs(hideVideoSongs)
-                                            .filterYoutubeShorts(hideYoutubeShorts),
+                                            .filterYoutubeShorts(hideYoutubeShorts)
+                                            .filterBlocked(blockedIds),
                                         result.continuation,
                                     )
                             }.onFailure {
@@ -167,7 +176,7 @@ constructor(
     fun loadMore() {
         val currentFilter = filter.value
         val filterValue = currentFilter?.value ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val viewState = viewStateMap[filterValue] ?: return@launch
             val continuation = viewState.continuation ?: return@launch
             val searchResult =
@@ -179,10 +188,12 @@ constructor(
             val hideExplicit = context.dataStore.get(HideExplicitKey, false)
             val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
             val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
+            val blockedIds = database.allBlockedSongIdsDirect().toSet()
             val newItems = resolvedItems
                 .filterExplicit(hideExplicit)
                 .filterVideoSongs(hideVideoSongs)
                 .filterYoutubeShorts(hideYoutubeShorts)
+                .filterBlocked(blockedIds)
             viewStateMap[filterValue] = ItemsPage(
                 (viewState.items + newItems).distinctBy { it.id },
                 searchResult.continuation

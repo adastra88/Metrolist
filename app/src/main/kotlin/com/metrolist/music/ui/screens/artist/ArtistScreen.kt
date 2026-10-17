@@ -183,9 +183,12 @@ fun ArtistScreen(
         }
     }
 
-    val distinctItemsBySection = remember(artistPage?.sections) {
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+
+    val distinctItemsBySection = remember(artistPage?.sections, blockedSongIdSet) {
         artistPage?.sections?.map { section ->
-            section.items.distinctBy { it.id }
+            section.items.filterNot { it is SongItem && it.id in blockedSongIdSet }.distinctBy { it.id }
         } ?: emptyList()
     }
 

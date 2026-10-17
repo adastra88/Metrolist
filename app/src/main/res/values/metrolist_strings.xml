@@ -994,4 +994,20 @@
     <string name="stream_source_web_creator_desc">Creator web client.</string>
     <string name="top_result">Top result</string>
     <string name="other">Other</string>
+
+    <!-- Blocked songs & dislike -->
+    <string name="dislike_and_block_song">Dislike &amp; block</string>
+    <string name="blocked_songs">Blocked songs</string>
+    <string name="blocked_songs_desc">Manage songs excluded from playback and recommendations</string>
+    <string name="no_blocked_songs">No blocked songs</string>
+    <string name="unblock_all">Unblock all</string>
+    <string name="unblock_all_confirm">Are you sure you want to unblock all songs?</string>
+    <string name="song_blocked">Song disliked and blocked</string>
+    <string name="song_unblocked">Song unblocked</string>
+    <string name="all_songs_unblocked">All songs unblocked</string>
+    <string name="block_sync_synced">Remote dislike synced</string>
+    <string name="block_sync_pending">Dislike sync pending</string>
+    <string name="block_sync_failed">Dislike sync failed</string>
+    <string name="block_sync_local">Local only</string>
+    <string name="retry_dislike_sync">Retry dislike sync</string>
 </resources>

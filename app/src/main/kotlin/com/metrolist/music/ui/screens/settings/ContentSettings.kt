@@ -1108,6 +1108,12 @@ fun ContentSettings(
                         )
                     },
                     onClick = { showQuickPicksDialog = true }
+                ),
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.block),
+                    title = { Text(stringResource(R.string.blocked_songs)) },
+                    description = { Text(stringResource(R.string.blocked_songs_desc)) },
+                    onClick = { navController.navigate("settings/content/blocked_songs") }
                 )
             )
         )

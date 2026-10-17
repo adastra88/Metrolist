@@ -67,6 +67,9 @@ import com.metrolist.music.R
 import com.metrolist.music.constants.ListItemHeight
 import com.metrolist.music.constants.ListThumbnailSize
 import com.metrolist.music.constants.ThumbnailCornerRadius
+import android.widget.Toast
+import com.metrolist.music.db.entities.BlockedSongEntity
+import com.metrolist.music.db.entities.BlockSyncStatus
 import com.metrolist.music.db.entities.SpeedDialItem
 import com.metrolist.music.db.entities.SongEntity
 import com.metrolist.music.extensions.toMediaItem
@@ -121,6 +124,8 @@ fun YouTubeSongMenu(
             }
         }
     }
+
+    val isBlocked by database.isBlocked(song.id).collectAsStateWithLifecycle(initialValue = false)
 
     var showChoosePlaylistDialog by rememberSaveable {  
         mutableStateOf(false)  
@@ -522,6 +527,51 @@ fun YouTubeSongMenu(
                                     }
                                 }
                                 onDismiss()
+                            }
+                        )
+                    )
+                    add(
+                        Material3MenuItemData(
+                            title = {
+                                Text(
+                                    text = stringResource(if (isBlocked) R.string.unblock else R.string.dislike_and_block_song)
+                                )
+                            },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(if (isBlocked) R.drawable.close else R.drawable.thumb_down),
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                onDismiss()
+                                if (isBlocked) {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        database.query {
+                                            deleteBlockedSong(song.id)
+                                        }
+                                    }
+                                    syncUtils.dislikeSong(song.id, dislike = false)
+                                    Toast.makeText(context, R.string.song_unblocked, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val blockedEntity = BlockedSongEntity(
+                                        id = song.id,
+                                        title = song.title,
+                                        artist = song.artists.joinToString(", ") { it.name },
+                                        thumbnailUrl = song.thumbnail,
+                                        duration = song.duration ?: 0,
+                                        blockedAt = LocalDateTime.now(),
+                                        remoteStatus = BlockSyncStatus.PENDING,
+                                    )
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        database.query {
+                                            insert(blockedEntity)
+                                        }
+                                    }
+                                    syncUtils.dislikeSong(song.id, dislike = true)
+                                    playerConnection.removeBlockedSongFromQueue(song.id)
+                                    Toast.makeText(context, R.string.song_blocked, Toast.LENGTH_SHORT).show()
+                                }
                             }
                         )
                     )

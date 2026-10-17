@@ -142,12 +142,20 @@ fun OnlinePlaylistScreen(
     var isSearching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
 
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+
     val filteredSongs =
-        remember(songs, query) {
-            if (query.text.isEmpty()) {
+        remember(songs, query, blockedSongIdSet) {
+            val unblocked = if (blockedSongIdSet.isEmpty()) {
                 songs.mapIndexed { i, s -> i to s }
             } else {
-                songs.mapIndexed { i, s -> i to s }.filter {
+                songs.mapIndexed { i, s -> i to s }.filter { it.second.id !in blockedSongIdSet }
+            }
+            if (query.text.isEmpty()) {
+                unblocked
+            } else {
+                unblocked.filter {
                     it.second.title.contains(query.text, true) ||
                         it.second.artists.fastAny { a -> a.name.contains(query.text, true) }
                 }

@@ -180,3 +180,10 @@ fun <T : YTItem> List<T>.filterYoutubeShorts(enabled: Boolean = false) =
     } else {
         this
     }
+
+fun <T : YTItem> List<T>.filterBlocked(blockedSongIds: Set<String>) =
+    if (blockedSongIds.isNotEmpty()) {
+        filterNot { it is SongItem && it.id in blockedSongIds }
+    } else {
+        this
+    }

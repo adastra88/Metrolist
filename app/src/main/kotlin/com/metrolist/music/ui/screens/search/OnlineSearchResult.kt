@@ -221,6 +221,28 @@ fun OnlineSearchResult(
         }
     }
 
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+
+    val filteredSummaries = remember(searchSummary, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) {
+            searchSummary?.summaries
+        } else {
+            searchSummary?.summaries?.mapNotNull { summary ->
+                val filtered = summary.items.filterNot { it is SongItem && it.id in blockedSongIdSet }
+                if (filtered.isEmpty()) null else summary.copy(items = filtered)
+            }
+        }
+    }
+
+    val filteredItems = remember(itemsPage, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) {
+            itemsPage?.items.orEmpty().distinctBy { it.id }
+        } else {
+            itemsPage?.items.orEmpty().filterNot { it is SongItem && it.id in blockedSongIdSet }.distinctBy { it.id }
+        }
+    }
+
     LaunchedEffect(lazyListState) {
         snapshotFlow {
             lazyListState.layoutInfo.visibleItemsInfo.any { it.key == "loading" }
@@ -493,7 +515,7 @@ fun OnlineSearchResult(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (searchFilter == null) {
-                        searchSummary?.summaries?.forEach { summary ->
+                        filteredSummaries?.forEach { summary ->
                             item {
                                 NavigationTitle(summary.title.toLocalizedSearchSection())
                             }
@@ -505,7 +527,7 @@ fun OnlineSearchResult(
                             )
                         }
 
-                        if (searchSummary?.summaries?.isEmpty() == true) {
+                        if (filteredSummaries?.isEmpty() == true) {
                             item {
                                 EmptyPlaceholder(
                                     icon = R.drawable.search,
@@ -515,7 +537,7 @@ fun OnlineSearchResult(
                         }
                     } else {
                         items(
-                            items = itemsPage?.items.orEmpty().distinctBy { it.id },
+                            items = filteredItems,
                             key = { "filtered_${it.id}" },
                             itemContent = ytItemContent,
                         )
@@ -530,7 +552,7 @@ fun OnlineSearchResult(
                             }
                         }
 
-                        if (itemsPage?.items?.isEmpty() == true) {
+                        if (filteredItems.isEmpty() && itemsPage?.items != null) {
                             item {
                                 EmptyPlaceholder(
                                     icon = R.drawable.search,

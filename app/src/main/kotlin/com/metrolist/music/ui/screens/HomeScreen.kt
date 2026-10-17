@@ -67,6 +67,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -660,21 +661,46 @@ fun HomeScreen(
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
-    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    val rawQuickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
+    val rawForgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
+    val rawKeepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    val rawSimilarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
     val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
-    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
+    val rawHomePage by viewModel.homePage.collectAsStateWithLifecycle()
     val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
-    val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
-    val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
+    val rawDailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
+    val rawCommunityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
 
     val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
     val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
     val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
     val pinnedSpeedDialItems by viewModel.pinnedSpeedDialItems.collectAsStateWithLifecycle()
     val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
+
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+
+    val homePage = remember(rawHomePage, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawHomePage else rawHomePage?.filterBlocked(blockedSongIdSet)
+    }
+    val quickPicks = remember(rawQuickPicks, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawQuickPicks else rawQuickPicks?.filterNot { it.id in blockedSongIdSet }
+    }
+    val forgottenFavorites = remember(rawForgottenFavorites, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawForgottenFavorites else rawForgottenFavorites?.filterNot { it.id in blockedSongIdSet }
+    }
+    val keepListening = remember(rawKeepListening, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawKeepListening else rawKeepListening?.filterNot { it is Song && it.id in blockedSongIdSet }
+    }
+    val dailyDiscover = remember(rawDailyDiscover, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawDailyDiscover else rawDailyDiscover?.filterNot { it.seed.id in blockedSongIdSet || (it.recommendation is SongItem && it.recommendation.id in blockedSongIdSet) }
+    }
+    val communityPlaylists = remember(rawCommunityPlaylists, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawCommunityPlaylists else rawCommunityPlaylists?.map { it.copy(songs = it.songs.filterNot { s -> s.id in blockedSongIdSet }) }
+    }
+    val similarRecommendations = remember(rawSimilarRecommendations, blockedSongIdSet) {
+        if (blockedSongIdSet.isEmpty()) rawSimilarRecommendations else rawSimilarRecommendations?.map { it.copy(items = it.items.filterNot { item -> item is SongItem && item.id in blockedSongIdSet }) }?.filter { it.items.isNotEmpty() }
+    }
 
     // Official podcast API data
     val savedPodcastShows by viewModel.savedPodcastShows.collectAsStateWithLifecycle()
@@ -789,15 +815,16 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    val currentContinuation by rememberUpdatedState(homePage?.continuation)
+    LaunchedEffect(lazylistState) {
         snapshotFlow {
-            lazylistState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.collect { lastVisibleIndex ->
-            val len = lazylistState.layoutInfo.totalItemsCount
-            if (lastVisibleIndex != null && lastVisibleIndex >= len - 3) {
-                viewModel.loadMoreYouTubeItems(homePage?.continuation)
+            val layoutInfo = lazylistState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            lastVisibleIndex != null && totalItems > 0 && lastVisibleIndex >= totalItems - 4
+        }.collect { shouldLoadMore ->
+            if (shouldLoadMore) {
+                viewModel.loadMoreYouTubeItems(currentContinuation)
             }
         }
     }

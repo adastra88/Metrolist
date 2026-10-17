@@ -100,6 +100,7 @@
 - Reorder songs in playlist or queue
 - YouTube Music account login
 - Sync songs, artists, albums, and playlists
+- Dislike and block unwanted songs (hide and prevent playback across queues and UI)
 
 </td>
   </tr>

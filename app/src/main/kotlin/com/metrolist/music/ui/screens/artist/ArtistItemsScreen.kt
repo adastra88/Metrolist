@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
+import com.metrolist.music.LocalDatabase
 import com.metrolist.music.LocalPlayerAwareWindowInsets
 import com.metrolist.music.LocalPlayerConnection
 import com.metrolist.music.R
@@ -85,6 +87,13 @@ fun ArtistItemsScreen(
     val title by viewModel.title.collectAsStateWithLifecycle()
     val itemsPage by viewModel.itemsPage.collectAsStateWithLifecycle()
 
+    val database = LocalDatabase.current
+    val blockedSongIds by database.allBlockedSongIds().collectAsStateWithLifecycle(emptyList())
+    val blockedSongIdSet = remember(blockedSongIds) { blockedSongIds.toSet() }
+    val filteredItems = remember(itemsPage, blockedSongIdSet) {
+        itemsPage?.items.orEmpty().filterNot { it is SongItem && it.id in blockedSongIdSet }.distinctBy { it.id }
+    }
+
     LaunchedEffect(lazyListState) {
         snapshotFlow {
             lazyListState.layoutInfo.visibleItemsInfo.any { it.key == "loading" }
@@ -113,13 +122,13 @@ fun ArtistItemsScreen(
         }
     }
 
-    if (itemsPage?.items?.firstOrNull() is SongItem) {
+    if (filteredItems.firstOrNull() is SongItem || itemsPage?.items?.firstOrNull() is SongItem) {
         LazyColumn(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
             items(
-                items = itemsPage?.items.orEmpty().distinctBy { it.id },
+                items = filteredItems,
                 key = { "artist_items_list_${it.id}" },
             ) { item ->
                 YouTubeListItem(
@@ -256,7 +265,7 @@ fun ArtistItemsScreen(
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
             items(
-                items = itemsPage?.items.orEmpty().distinctBy { it.id },
+                items = filteredItems,
                 key = { "artist_items_grid_${it.id}" },
             ) { item ->
                 YouTubeGridItem(
